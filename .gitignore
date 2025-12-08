@@ -53,7 +53,6 @@ db.sqlite3-journal
 
 # Terraform
 **/.terraform/
-**/.terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.*
 *.tfvars
