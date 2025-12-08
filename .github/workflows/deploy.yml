@@ -98,8 +98,21 @@ jobs:
     - name: Terraform Init
       run: |
         cd infra/terraform
-        terraform init -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
+        terraform init -reconfigure \
+                       -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
                        -backend-config="region=${{ env.AWS_REGION }}"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Terraform Plan
+      run: |
+        cd infra/terraform
+        terraform plan \
+                       -var="db_password=${{ secrets.DB_PASSWORD }}" \
+                       -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
+                       -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
+                       -out=tfplan
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -107,7 +120,7 @@ jobs:
     - name: Terraform Apply
       run: |
         cd infra/terraform
-        terraform apply -auto-approve
+        terraform apply -auto-approve tfplan
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
