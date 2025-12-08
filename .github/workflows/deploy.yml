@@ -45,28 +45,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
-    - name: Debug - List files
-      run: |
-        echo "=== Root directory ==="
-        ls -la
-        echo "=== servicio_usuario directory ==="
-        ls -la servicio_usuario/
-
-
     - name: Install dependencies
       run: |
-        cd servicio_usuario
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
+
     - name: Run migrations
-      working-directory: ./servicio_usuario
       run: python manage.py migrate
       env:
         DEBUG: True
-    
+
     - name: Run tests with coverage
-      working-directory: ./servicio_usuario
       run: |
         pip install coverage
         coverage run --source='usuario' manage.py test usuario
@@ -76,7 +65,7 @@ jobs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        files: ./servicio_usuario/coverage.xml
+        files: ./coverage.xml
         fail_ci_if_error: false
 
   plan:
@@ -143,8 +132,8 @@ jobs:
     - name: 🐳 Build & Push Docker Image
       uses: docker/build-push-action@v4
       with:
-        context: ./servicio_usuario
-        file: ./servicio_usuario/Dockerfile
+        context: .
+        file: ./Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/ms-usuario:latest
 
@@ -199,7 +188,6 @@ jobs:
           cd ~/app
           git pull origin main
           source env/bin/activate
-          cd servicio_usuario
           python manage.py migrate
           sudo systemctl restart usuario-service
         EOF
