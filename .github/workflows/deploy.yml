@@ -18,7 +18,7 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: test_db
+          POSTGRES_DB: usuario_db_ecomerce
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
