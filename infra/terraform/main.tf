@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "mi-bucket-terraform-ecommerce-project"
-    key            = "infra/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-lock"
+    bucket  = "mi-bucket-terraform-ecommerce-project"
+    key     = "infra/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+    # dynamodb_table = "terraform-lock"  # ← Comentado temporalmente
   }
 }
 
