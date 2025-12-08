@@ -128,7 +128,8 @@ jobs:
     - name: Get Outputs
       run: |
         cd infra/terraform
-        echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+        # Se elimina la comilla doble
+        echo EC2_IP=$(terraform output -raw ec2_public_ip) >> $GITHUB_ENV
 
     - name: Deploy Django App
       run: |
