@@ -151,19 +151,6 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: Terraform Plan
-      run: |
-        cd infra/terraform
-        terraform plan -var="terraform_bucket=${{ secrets.TERRAFORM_BUCKET }}" \
-                       -var="db_password=${{ secrets.DB_PASSWORD }}" \
-                       -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
-                       -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
-                       -var="docker_image=${{ secrets.DOCKERHUB_USERNAME }}/ms-usuario:latest" \
-                       -out=tfplan
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
     - name: Terraform Apply
       run: |
         cd infra/terraform
