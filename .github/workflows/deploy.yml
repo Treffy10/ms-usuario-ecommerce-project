@@ -45,6 +45,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
+    - name: Debug - List files
+      run: |
+        echo "=== Root directory ==="
+        ls -la
+        echo "=== servicio_usuario directory ==="
+        ls -la servicio_usuario/
+
+
     - name: Install dependencies
       run: |
         cd servicio_usuario
