@@ -68,53 +68,6 @@ jobs:
         files: ./coverage.xml
         fail_ci_if_error: false
 
-  plan:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-    - name: Terraform Init
-      run: |
-        cd infra/terraform
-        terraform init -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
-                       -backend-config="region=${{ env.AWS_REGION }}"
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-    - name: Terraform Plan
-      run: |
-        cd infra/terraform
-        terraform plan -var="terraform_bucket=${{ secrets.TERRAFORM_BUCKET }}" \
-                       -var="db_password=${{ secrets.DB_PASSWORD }}" \
-                       -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
-                       -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
-                       -out=tfplan
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-    - name: Terraform Plan Comment
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-          const plan = fs.readFileSync('infra/terraform/tfplan', 'utf8');
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `## Terraform Plan\n\`\`\`\n${plan}\n\`\`\``
-          });
-
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -154,7 +107,7 @@ jobs:
     - name: Terraform Apply
       run: |
         cd infra/terraform
-        terraform apply -auto-approve tfplan
+        terraform apply -auto-approve
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
