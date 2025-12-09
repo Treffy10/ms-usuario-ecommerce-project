@@ -126,26 +126,27 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: Get Outputs
+      id: output_vars # <--- Necesario para el paso siguiente
       run: |
         cd infra/terraform
-        # Se asegura de que la salida no tenga comillas y va a GITHUB_ENV
-        echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
-
+        # FORMATO DE SALIDA LIMPIO: CLAVE=VALOR directo al archivo $GITHUB_OUTPUT
+        echo "ec2_ip=$(terraform output -raw ec2_public_ip | tr -d '\n\r')" >> $GITHUB_OUTPUT
+    
     - name: Deploy Django App
-      # La variable EC2_IP del paso anterior ya está cargada en el entorno
-      env:
-        EC2_IP_ADDRESS: ${{ env.EC2_IP }} # <-- Accedemos a la variable de entorno aquí
-        
       run: |
+        # 1. Obtenemos el valor de la IP del paso anterior y lo asignamos a una variable de shell
+        IP_ADDRESS=${{ steps.output_vars.outputs.ec2_ip }}
+        
+        # 2. Configuración SSH
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         
-        # Usamos la variable de shell $EC2_IP_ADDRESS, que ya fue inicializada
-        ssh-keyscan -H $EC2_IP_ADDRESS >> ~/.ssh/known_hosts
+        # 3. Usamos la variable de shell $IP_ADDRESS para el keyscan
+        ssh-keyscan -H $IP_ADDRESS >> ~/.ssh/known_hosts
         
-        # Usamos la variable de shell para la conexión
-        ssh -i ~/.ssh/id_rsa ubuntu@$EC2_IP_ADDRESS << 'EOF'
+        # 4. Usamos la variable de shell para la conexión SSH
+        ssh -i ~/.ssh/id_rsa ubuntu@$IP_ADDRESS << 'EOF'
           cd ~/app
           git pull origin main
           source env/bin/activate
