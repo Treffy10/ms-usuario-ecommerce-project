@@ -142,8 +142,12 @@ systemctl start nginx
 
 # Iniciar Docker Compose
 cd /home/ubuntu/app
-export DB_PASSWORD="${DB_PASSWORD}"
-export SECRET_KEY="${SECRET_KEY}"
+
+# === ELIMINA LAS LÍNEAS "export" AQUÍ ===
+# export DB_PASSWORD="${DB_PASSWORD}"
+# export SECRET_KEY="${SECRET_KEY}"
+# =======================================
+
 /usr/local/bin/docker-compose up -d
 
 # Log
