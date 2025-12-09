@@ -130,7 +130,7 @@ jobs:
       run: |
         cd infra/terraform
         # Usamos $GITHUB_OUTPUT para el output instantáneo
-        echo "ec2_ip=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+        echo ec2_ip=$(terraform output -raw ec2_public_ip) >> $GITHUB_OUTPUT
 
     - name: Deploy Django App
       run: |
