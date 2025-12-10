@@ -130,7 +130,7 @@ jobs:
       run: |
         cd infra/terraform
         # Se escribe la IP limpia y sin saltos de línea al archivo de entorno
-        echo "EC2_IP=$(terraform output -raw ec2_public_ip | tr -d '\n\r')" >> $GITHUB_ENV
+        echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
     
     - name: Deploy Django App
       # 1. Inyectamos la variable EC2_IP del entorno global (GITHUB_ENV)
