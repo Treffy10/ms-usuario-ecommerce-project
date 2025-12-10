@@ -130,7 +130,7 @@ jobs:
       run: |
         cd infra/terraform
         # Se escribe la IP limpia y sin saltos de línea al archivo de entorno
-        echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+        echo "EC2_IP=$(terraform output -raw ec2_public_ip | tr -d '\n\r')" >> $GITHUB_ENV
     
     - name: Deploy Django App
       # 1. Inyectamos la variable EC2_IP del entorno global (GITHUB_ENV)
@@ -138,18 +138,18 @@ jobs:
         DEPLOY_IP: ${{ env.EC2_IP }} 
         
       run: |
-        # Usamos la variable de shell $DEPLOY_IP (ya cargada)
+        # 2. Asignación de shell (opcional, pero limpio)
         DEPLOY_IP_ADDRESS="$DEPLOY_IP"
         
-        # 2. Configuración SSH
+        # 3. Configuración SSH
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         
-        # 3. Usamos la variable de shell $DEPLOY_IP_ADDRESS para el keyscan
+        # 4. Usamos la variable de shell $DEPLOY_IP_ADDRESS
         ssh-keyscan -H $DEPLOY_IP_ADDRESS >> ~/.ssh/known_hosts
         
-        # 4. Conexión SSH
+        # 5. Conexión SSH
         ssh -i ~/.ssh/id_rsa ubuntu@$DEPLOY_IP_ADDRESS << 'EOF'
           cd ~/app
           git pull origin main
