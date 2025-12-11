@@ -198,7 +198,7 @@ jobs:
           # Migraciones y reinicio del servicio
           python manage.py migrate --noinput
           sudo systemctl restart usuario-service || (sudo systemctl daemon-reload && sudo systemctl restart usuario-service)
-EOF
+        EOF
 
     - name: Notify deployment success
       run: echo "✅ Despliegue exitoso en AWS con Terraform"
