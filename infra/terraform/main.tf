@@ -123,7 +123,7 @@ resource "aws_instance" "app" {
   instance_type          = var.ec2_instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.ec2.id]
-  key_name               = aws_key_pair.deployer.key_name
+  key_name               = data.aws_key_pair.existing.key_name  # ← Usa el existente
 
   root_block_device {
     volume_size           = 30
@@ -153,14 +153,9 @@ resource "aws_eip" "app" {
   depends_on = [aws_internet_gateway.main]
 }
 
-# Key Pair
-resource "aws_key_pair" "deployer" {
-  key_name   = "ecommerce-deployer-key"
-  public_key = var.public_key_content
-
-  tags = {
-    Name = "ecommerce-deployer-key"
-  }
+# Usa un data source para referenciar el existente
+data "aws_key_pair" "existing" {
+  key_name = "clavesecret12345"  # ← Tu key pair existente
 }
 
 # S3 Bucket para backups y archivos estáticos

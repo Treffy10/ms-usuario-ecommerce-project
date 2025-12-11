@@ -100,7 +100,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         cd infra/terraform
-        terraform init -reconfigure \
+        terraform init \
           -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
           -backend-config="key=infra/terraform.tfstate" \
           -backend-config="region=${{ env.AWS_REGION }}"
