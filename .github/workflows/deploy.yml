@@ -127,16 +127,23 @@ jobs:
 
     - name: Get Outputs (escribe EC2_IP en GITHUB_ENV)
       working-directory: infra/terraform
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         ip=$(terraform output -raw ec2_public_ip 2>/dev/null | tr -d '\n' | tr -d '\r')
         echo "EC2_IP=$ip" >> $GITHUB_ENV
 
 
     - name: Verificar EC2_IP antes del deploy
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         if [ -z "$EC2_IP" ]; then
           echo "❌ ERROR: Terraform no devolvió ec2_public_ip."
-          terraform -version || true
+          cd infra/terraform
+          terraform output
           exit 1
         fi
         echo "✅ IP detectada: $EC2_IP"
