@@ -155,7 +155,7 @@ resource "aws_eip" "app" {
 
 # Usa un data source para referenciar el existente
 data "aws_key_pair" "existing" {
-  key_name = "clavesecret12345"  # ← Tu key pair existente
+  key_name = "clavesecreta12345"  # ← Tu key pair existente
 }
 
 # S3 Bucket para backups y archivos estáticos
