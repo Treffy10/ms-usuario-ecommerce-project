@@ -37,7 +37,7 @@ services:
     image: postgres:15-alpine
     container_name: ecommerce-postgres
     environment:
-      POSTGRES_DB: ecommerce_db
+      POSTGRES_DB: usuario_db_ecomerce
       POSTGRES_USER: ecommerce_admin
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -62,7 +62,7 @@ services:
     environment:
       DEBUG: "False"
       SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: postgresql://ecommerce_admin:${DB_PASSWORD}@postgres:5432/ecommerce_db
+      DATABASE_URL: postgresql://ecommerce_admin:${DB_PASSWORD}@postgres:5432/usuario_db_ecomerce
       ALLOWED_HOSTS: "*"
     volumes:
       - /home/ubuntu/app/servicio_usuario:/app
