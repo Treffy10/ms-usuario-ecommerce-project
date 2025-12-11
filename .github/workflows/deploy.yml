@@ -165,8 +165,8 @@ jobs:
         ssh-keyscan -H "$DEPLOY_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
 
         # Esperar que SSH esté disponible (reintentos)
-        max_tries=20
-        wait_seconds=6
+        max_tries=60
+        wait_seconds=10
         i=0
         until ssh -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/id_rsa "$SSH_USER"@"$DEPLOY_IP" 'echo OK' 2>/dev/null; do
           i=$((i+1))
