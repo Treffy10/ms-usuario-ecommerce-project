@@ -158,21 +158,9 @@ data "aws_key_pair" "existing" {
   key_name = "clavesecreta12345"  # ← Tu key pair existente
 }
 
-# S3 Bucket para backups y archivos estáticos
-resource "aws_s3_bucket" "static_files" {
-  bucket = "ecommerce-static-files-${data.aws_caller_identity.current.account_id}"
-
-  tags = {
-    Name = "ecommerce-static-files"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "static_files" {
-  bucket = aws_s3_bucket.static_files.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
+# S3 Bucket para archivos estáticos
+data "aws_s3_bucket" "existing_bucket" {
+  bucket = "mi-bucket-terraform-ecommerce-project"  # ← El nombre EXACTO de tu bucket
 }
 
 # Outputs
@@ -187,6 +175,6 @@ output "ec2_instance_id" {
 }
 
 output "s3_bucket_name" {
-  value       = aws_s3_bucket.static_files.id
+  value       = data.aws_s3_bucket.existing_bucket.id
   description = "Nombre del bucket S3"
 }
