@@ -28,6 +28,11 @@ variable "ec2_instance_type" {
   description = "Tipo de instancia EC2"
 }
 
+variable "dockerhub_username" {
+  description = "El nombre de usuario de Docker Hub para taggear la imagen."
+  type        = string
+}
+
 variable "db_password" {
   type        = string
   description = "Contraseña de PostgreSQL"
