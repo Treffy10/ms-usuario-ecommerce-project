@@ -22,7 +22,7 @@ mkdir -p /home/ubuntu/app
 cd /home/ubuntu/app
 
 # Clonar repositorio
-git clone https://github.com/Treffy10/ms-usuario-ecommerce-project.git 
+git clone https://github.com/Treffy10/ms-usuario-ecommerce-project.git .
 
 # Crear carpeta para datos de PostgreSQL
 mkdir -p /home/ubuntu/app/postgres_data

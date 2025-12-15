@@ -125,28 +125,31 @@ jobs:
         cd infra/terraform
         terraform apply -auto-approve tfplan
 
-    - name: Get EC2 IP
+    - name: Get Outputs (escribe EC2_IP en GITHUB_ENV)
       working-directory: infra/terraform
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: us-east-1
       run: |
-        set -e
-        EC2_IP=$(terraform output -raw ec2_public_ip)
-        echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
+        ip=$(terraform output -raw ec2_public_ip 2>/dev/null | tr -d '\n' | tr -d '\r')
+        echo "EC2_IP=$ip" >> $GITHUB_ENV
 
 
     - name: Verificar EC2_IP antes del deploy
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         if [ -z "$EC2_IP" ]; then
-          echo "❌ ERROR: Terraform no devolvió ec2_public_ip"
+          echo "❌ ERROR: Terraform no devolvió ec2_public_ip."
+          cd infra/terraform
+          terraform output
           exit 1
         fi
         echo "✅ IP detectada: $EC2_IP"
 
-
     - name: Deploy Django App (SSH + reintentos)
+      # NOTA: después de escribir a GITHUB_ENV, $EC2_IP ya está disponible en este step
       env:
         SSH_PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
         SSH_USER: ubuntu
@@ -188,7 +191,7 @@ jobs:
 
           if [ ! -d env ]; then
             python3 -m venv env
-          fi
+          fi 
           source env/bin/activate
 
           pip install --upgrade pip
@@ -199,7 +202,6 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart usuario-service
         EOF
-
 
     - name: Notify deployment success
       run: echo "✅ Despliegue exitoso en AWS con Terraform"
