@@ -1,34 +1,38 @@
 #!/bin/bash
 set -e
 
-# Actualizar sistema
+# --- 1. Preparación del Sistema ---
+echo "Actualizando sistema e instalando herramientas base..."
 apt-get update
 apt-get upgrade -y
+apt-get install -y git nginx
 
-# Instalar Docker
+# --- 2. Instalación de Docker y Docker Compose ---
+echo "Instalando Docker..."
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 usermod -aG docker ubuntu
 
-# Instalar Docker Compose
+echo "Instalando Docker Compose..."
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 
-# Instalar Git y otras herramientas
-apt-get install -y git nginx supervisor python3.11 python3.11-venv
-
-# Crear directorio de la aplicación
+# --- 3. Configuración de la Aplicación y Variables ---
+echo "Creando estructura de la app..."
 mkdir -p /home/ubuntu/app
 cd /home/ubuntu/app
 
-# Clonar repositorio
-git clone https://github.com/Treffy10/ms-usuario-ecommerce-project.git .
+# Importante: Este archivo .env debe ser llenado por Terraform!
+# Lo creamos vacío para evitar fallos de docker-compose
+touch /home/ubuntu/app/.env 
 
-# Crear carpeta para datos de PostgreSQL
+# Crear carpetas de datos
 mkdir -p /home/ubuntu/app/postgres_data
+mkdir -p /home/ubuntu/app/static_files
 chown -R ubuntu:ubuntu /home/ubuntu/app
 
-# Crear docker-compose.yml
+# --- 4. Crear docker-compose.yml (Usando la imagen de Docker Hub) ---
+echo "Creando docker-compose.yml..."
 cat > /home/ubuntu/app/docker-compose.yml << 'EOF'
 version: '3.8'
 
@@ -36,10 +40,11 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: ecommerce-postgres
+    # Las variables vienen del archivo .env que se llena con Terraform
     environment:
       POSTGRES_DB: usuario_db_ecomerce
       POSTGRES_USER: ecommerce_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD} 
     volumes:
       - /home/ubuntu/app/postgres_data:/var/lib/postgresql/data
     ports:
@@ -52,12 +57,13 @@ services:
       retries: 5
 
   django-app:
-    build:
-      context: ./servicio_usuario
-      dockerfile: Dockerfile
+    # 💡 Usamos la imagen de Docker Hub que construimos en GitHub Actions
+    image: ${IMAGE_TAG} 
     container_name: ecommerce-django
+    # 💡 Comando modificado: Migra y luego sirve con Gunicorn
     command: >
-      sh -c "python manage.py migrate &&
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
              gunicorn --workers 4 --bind 0.0.0.0:8000 --timeout 120 servicio_usuario.wsgi"
     environment:
       DEBUG: "False"
@@ -65,8 +71,8 @@ services:
       DATABASE_URL: postgresql://ecommerce_admin:${DB_PASSWORD}@postgres:5432/usuario_db_ecomerce
       ALLOWED_HOSTS: "*"
     volumes:
-      - /home/ubuntu/app/servicio_usuario:/app
-      - /home/ubuntu/app/static_files:/app/static
+      # Montamos solo los estáticos para Nginx
+      - /home/ubuntu/app/static_files:/app/static 
     ports:
       - "8000:8000"
     depends_on:
@@ -75,41 +81,10 @@ services:
     restart: always
 EOF
 
-# Crear Dockerfile para Django
-mkdir -p /home/ubuntu/app/servicio_usuario
-cat > /home/ubuntu/app/servicio_usuario/Dockerfile << 'EOF'
-FROM python:3.11-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-EOF
-
-# Actualizar requirements.txt
-cat > /home/ubuntu/app/servicio_usuario/requirements.txt << 'EOF'
-Django==5.2.8
-djangorestframework==3.16.1
-django-cors-headers==4.9.0
-djangorestframework-simplejwt==5.5.1
-psycopg2-binary==2.9.11
-python-decouple==3.8
-gunicorn==22.0.0
-EOF
-
-# Cambiar permisos
-chown -R ubuntu:ubuntu /home/ubuntu/app
-
-# Configurar Nginx
+# --- 5. Configuración de Nginx ---
+echo "Configurando Nginx..."
 cat > /etc/nginx/sites-available/ecommerce << 'NGINX'
+# ... (Nginx se mantiene igual, ya que es una configuración estándar)
 upstream django {
     server 127.0.0.1:8000;
 }
@@ -140,15 +115,12 @@ nginx -t
 systemctl enable nginx
 systemctl start nginx
 
-# Iniciar Docker Compose
+# --- 6. Primera ejecución (solo para levantar la DB y dejar todo listo) ---
+echo "Iniciando Docker Compose por primera vez (Postgres/Django-App)..."
 cd /home/ubuntu/app
-
-# === ELIMINA LAS LÍNEAS "export" AQUÍ ===
-# export DB_PASSWORD="${DB_PASSWORD}"
-# export SECRET_KEY="${SECRET_KEY}"
-# =======================================
-
+# No usamos -d, lo hacemos en segundo plano para que el user_data termine
+/usr/local/bin/docker-compose pull
 /usr/local/bin/docker-compose up -d
 
 # Log
-echo "Aplicación desplegada con Docker Compose" > /var/log/deployment.log
+echo "✅ Instalación inicial completada." > /var/log/deployment.log
