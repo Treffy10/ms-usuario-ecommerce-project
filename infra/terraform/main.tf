@@ -117,24 +117,58 @@ resource "aws_security_group" "ec2" {
   }
 }
 
+# ----------------------------------------------------
+# Lógica para Inyectar Secretos y Archivos de Configuración
+# ----------------------------------------------------
+
+# 1. Genera el contenido del archivo .env a partir de la plantilla (.env.tpl)
+# Este contenido ya tiene los secretos y el IMAGE_TAG.
+locals {
+  env_file_content = templatefile("${path.module}/.env.tpl", {
+    db_password       = var.db_password
+    django_secret_key = var.django_secret_key
+    # Necesitas que esta variable 'dockerhub_username' exista en variables.tf o se pase desde GH Actions
+    image_tag         = "${var.dockerhub_username}/ms-usuario:latest" 
+  })
+}
+
+# 2. Lee el script base user_data.sh
+data "template_file" "user_data_script" {
+  template = file("${path.module}/user_data.sh")
+}
+
 # EC2 Instance
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.ec2_instance_type
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.ec2.id]
-  key_name               = data.aws_key_pair.existing.key_name  # ← Usa el existente
+  ami                      = data.aws_ami.ubuntu.id
+  instance_type            = var.ec2_instance_type
+  subnet_id                = aws_subnet.public.id
+  vpc_security_group_ids   = [aws_security_group.ec2.id]
+  key_name                 = data.aws_key_pair.existing.key_name
 
   root_block_device {
-    volume_size           = 30
-    volume_type           = "gp3"
-    delete_on_termination = true
+    volume_size             = 30
+    volume_type             = "gp3"
+    delete_on_termination   = true
   }
 
-  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
-    DB_PASSWORD = var.db_password
-    SECRET_KEY  = var.django_secret_key
-  }))
+  # --- Bloque USER DATA CORREGIDO: Inyecta el .env ---
+  user_data = base64encode(
+    <<-EOF
+    #!/bin/bash
+    set -e
+    
+    # 1. Ejecuta el script de instalación base (user_data.sh)
+    ${data.template_file.user_data_script.rendered}
+    
+    # 2. Inyección de variables secretas (Crea el archivo /home/ubuntu/app/.env)
+    echo "Inyectando secretos en /home/ubuntu/app/.env..."
+    echo '${local.env_file_content}' > /home/ubuntu/app/.env
+    chown ubuntu:ubuntu /home/ubuntu/app/.env
+    echo "✅ Archivo .env creado."
+    # --- Fin de la inyección ---
+    EOF
+  )
+  # --------------------------------------------------
 
   tags = {
     Name = "ecommerce-usuario-service"
