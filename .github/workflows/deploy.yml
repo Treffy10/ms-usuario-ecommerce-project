@@ -125,64 +125,54 @@ jobs:
         cd infra/terraform
         terraform apply -auto-approve tfplan
 
-    - name: Get Outputs (escribe EC2_IP en GITHUB_ENV)
+    - name: Get EC2 IP
       working-directory: infra/terraform
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
-        ip=$(terraform output -raw ec2_public_ip 2>/dev/null | tr -d '\n' | tr -d '\r')
-        echo "EC2_IP=$ip" >> $GITHUB_ENV
-
+        EC2_IP=$(terraform output -raw ec2_public_ip | tr -d '\n' | tr -d '\r')
+        echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
 
     - name: Verificar EC2_IP antes del deploy
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
         if [ -z "$EC2_IP" ]; then
-          echo "❌ ERROR: Terraform no devolvió ec2_public_ip."
-          cd infra/terraform
-          terraform output
+          echo "❌ ERROR: Terraform no devolvió ec2_public_ip"
           exit 1
         fi
         echo "✅ IP detectada: $EC2_IP"
 
+
     - name: Deploy Django App (SSH + reintentos)
-      # NOTA: después de escribir a GITHUB_ENV, $EC2_IP ya está disponible en este step
       env:
         SSH_PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
         SSH_USER: ubuntu
       run: |
-        DEPLOY_IP="$EC2_IP"
-        echo "Deploy a: $DEPLOY_IP"
+        echo "🚀 Deploy a: $EC2_IP"
 
         mkdir -p ~/.ssh
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
 
-        # Añadir host key (previene prompt interactivo)
-        ssh-keyscan -H "$DEPLOY_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-        # Esperar que SSH esté disponible (reintentos)
-        max_tries=60
-        wait_seconds=10
-        i=0
-        until ssh -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/id_rsa "$SSH_USER"@"$DEPLOY_IP" 'echo OK' 2>/dev/null; do
-          i=$((i+1))
-          echo "Esperando SSH en $DEPLOY_IP — intento $i/$max_tries..."
-          if [ "$i" -ge "$max_tries" ]; then
-            echo "❌ Timeout esperando SSH en $DEPLOY_IP"
+        # Esperar a que SSH esté disponible
+        for i in {1..60}; do
+          echo "⏳ Esperando SSH ($i/60) en $EC2_IP..."
+          if ssh -o StrictHostKeyChecking=no \
+                 -o ConnectTimeout=5 \
+                 -i ~/.ssh/id_rsa \
+                 "$SSH_USER@$EC2_IP" "echo SSH_OK" >/dev/null 2>&1; then
+            echo "✅ SSH disponible"
+            break
+          fi
+          sleep 10
+          if [ "$i" -eq 60 ]; then
+            echo "❌ Timeout esperando SSH"
             exit 1
           fi
-          sleep $wait_seconds
         done
 
-        # Ejecutar despliegue remoto (no expandir variables locales dentro del EOF)
-        ssh -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa "$SSH_USER"@"$DEPLOY_IP" <<'EOF'
+        # Deploy remoto
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa "$SSH_USER@$EC2_IP" <<'EOF'
           set -e
           cd /home/ubuntu/app || exit 1
-          # Si no existe .git, clonar; si existe, hacer pull
+
           if [ ! -d .git ]; then
             git clone https://github.com/Treffy10/ms-usuario-ecommerce-project.git .
           else
@@ -190,18 +180,20 @@ jobs:
             git reset --hard origin/main
           fi
 
-          # Activar virtualenv e instalar dependencias
           if [ ! -d env ]; then
             python3 -m venv env
           fi
           source env/bin/activate
+
           pip install --upgrade pip
           pip install -r requirements.txt
 
-          # Migraciones y reinicio del servicio
           python manage.py migrate --noinput
-          sudo systemctl restart usuario-service || (sudo systemctl daemon-reload && sudo systemctl restart usuario-service)
+
+          sudo systemctl daemon-reload
+          sudo systemctl restart usuario-service
         EOF
+
 
     - name: Notify deployment success
       run: echo "✅ Despliegue exitoso en AWS con Terraform"
