@@ -127,9 +127,15 @@ jobs:
 
     - name: Get EC2 IP
       working-directory: infra/terraform
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: us-east-1
       run: |
-        EC2_IP=$(terraform output -raw ec2_public_ip | tr -d '\n' | tr -d '\r')
+        set -e
+        EC2_IP=$(terraform output -raw ec2_public_ip)
         echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
+
 
     - name: Verificar EC2_IP antes del deploy
       run: |
