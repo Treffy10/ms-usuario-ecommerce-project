@@ -127,7 +127,6 @@ jobs:
           -var="db_password=${{ secrets.DB_PASSWORD }}" \
           -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
           -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
-          -var="dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \ # <-- ¡Añade esta línea!
           -out=tfplan
 
     - name: Terraform Apply
