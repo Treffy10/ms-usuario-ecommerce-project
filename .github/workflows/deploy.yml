@@ -106,12 +106,52 @@ jobs:
 
     # (Init, Plan, Apply - Se mantienen igual)
 
-    - name: Get Outputs (escribe EC2_IP en GITHUB_ENV)
+    - name: Terraform Init
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        cd infra/terraform
+        terraform init \
+          -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
+          -backend-config="key=infra/terraform.tfstate" \
+          -backend-config="region=${{ env.AWS_REGION }}"
+
+    - name: Terraform Plan
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        cd infra/terraform
+        terraform plan \
+          -var="db_password=${{ secrets.DB_PASSWORD }}" \
+          -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
+          -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
+          -out=tfplan
+
+    - name: Terraform Apply
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        cd infra/terraform
+        terraform apply -auto-approve tfplan
+
+    - name: Get Outputs (Inicializa y Obtiene EC2_IP)
       working-directory: infra/terraform
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
+        # 1. Ejecutar Init de nuevo, pero con la bandera -reconfigure
+        # Esto resuelve el error "Backend initialization required" que viste.
+        terraform init \
+          -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
+          -backend-config="key=infra/terraform.tfstate" \
+          -backend-config="region=${{ env.AWS_REGION }}" \
+          -reconfigure 
+        
+        # 2. Ahora que el backend está configurado, podemos leer el output
         ip=$(terraform output -raw ec2_public_ip 2>/dev/null | tr -d '\n' | tr -d '\r')
         echo "EC2_IP=$ip" >> $GITHUB_ENV
 
