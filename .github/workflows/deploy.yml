@@ -118,6 +118,8 @@ jobs:
           -backend-config="region=${{ env.AWS_REGION }}"
 
     - name: Terraform Plan
+      # Resuelve: 'Reference to undeclared input variable' (image_0bb877.png)
+      # Resuelve: 'Too many command line arguments' (image_7faa64.png)
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -127,7 +129,7 @@ jobs:
           -var="db_password=${{ secrets.DB_PASSWORD }}" \
           -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
           -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
-          -var="dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \ 
+          -var="dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \
           -out=tfplan
 
     - name: Terraform Apply
@@ -137,7 +139,7 @@ jobs:
       run: |
         cd infra/terraform
         terraform apply -auto-approve tfplan
-
+        
     - name: Get Outputs (Inicializa y Obtiene EC2_IP)
       working-directory: infra/terraform
       env:
