@@ -57,15 +57,10 @@ services:
       retries: 5
 
   django-app:
-    # 💡 Usamos la imagen de Docker Hub que construimos en GitHub Actions
-    image: ${IMAGE_TAG} 
-    container_name: ecommerce-django
-    # 💡 Comando modificado: Migra y luego sirve con Gunicorn
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --workers 4 --bind 0.0.0.0:8000 --timeout 120 servicio_usuario.wsgi"
-    environment:
+    container_name: ecommerce-django
+    # 💡 Comando SIMPLIFICADO. El entrypoint.sh dentro de la imagen hará las migraciones.
+    command: ["gunicorn", "servicio_usuario.wsgi:application", "--workers", "4", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+    environment:
       DEBUG: "False"
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: postgresql://ecommerce_admin:${DB_PASSWORD}@postgres:5432/usuario_db_ecomerce
