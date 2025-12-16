@@ -117,26 +117,6 @@ resource "aws_security_group" "ec2" {
   }
 }
 
-# ----------------------------------------------------
-# Lógica para Inyectar Secretos y Archivos de Configuración
-# ----------------------------------------------------
-
-# 1. Genera el contenido del archivo .env a partir de la plantilla (.env.tpl)
-# Este contenido ya tiene los secretos y el IMAGE_TAG.
-locals {
-  env_file_content = templatefile("${path.module}/.env.tpl", {
-    db_password       = var.db_password
-    django_secret_key = var.django_secret_key
-    # Necesitas que esta variable 'dockerhub_username' exista en variables.tf o se pase desde GH Actions
-    image_tag         = "${var.dockerhub_username}/ms-usuario:latest" 
-  })
-}
-
-# 2. Lee el script base user_data.sh
-data "template_file" "user_data_script" {
-  template = file("${path.module}/user_data.sh")
-}
-
 # EC2 Instance
 resource "aws_instance" "app" {
   ami                      = data.aws_ami.ubuntu.id
@@ -153,16 +133,25 @@ resource "aws_instance" "app" {
 
   # --- Bloque USER DATA CORREGIDO: Inyecta el .env ---
   user_data = base64encode(
+    # PASAMOS UNA SOLA CADENA MULTILÍNEA A base64encode
+    # Esta única cadena contiene la inyección del script user_data.sh y la inyección del .env
     <<-EOF
     #!/bin/bash
     set -e
     
-    # 1. Ejecuta el script de instalación base (user_data.sh)
-    ${data.template_file.user_data_script.rendered}
+    # 1. EJECUTA EL SCRIPT DE INSTALACIÓN BASE
+    # El archivo user_data.sh ya no debe tener un shebang #!/bin/bash
+    ${file("${path.module}/user_data.sh")}
     
-    # 2. Inyección de variables secretas (Crea el archivo /home/ubuntu/app/.env)
+    # 2. INYECCIÓN DE VARIABLES SECRETAS (Crea el archivo /home/ubuntu/app/.env)
     echo "Inyectando secretos en /home/ubuntu/app/.env..."
-    echo '${local.env_file_content}' > /home/ubuntu/app/.env
+    
+    echo '${templatefile("${path.module}/.env.tpl", {
+      db_password       = var.db_password,
+      django_secret_key = var.django_secret_key,
+      image_tag         = "${var.dockerhub_username}/ms-usuario:latest" 
+    })}' > /home/ubuntu/app/.env
+    
     chown ubuntu:ubuntu /home/ubuntu/app/.env
     echo "✅ Archivo .env creado."
     # --- Fin de la inyección ---
