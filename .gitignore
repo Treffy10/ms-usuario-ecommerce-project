@@ -1,124 +1,78 @@
-# Entorno Virtual
-env/
-venv/
-ENV/
-.env
-.env.local
-.env.*.local
-
+########################
 # Python
+########################
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Django
+*.pyo
+*.pyd
+*.pyc
 *.log
-local_settings.py
+
+########################
+# Entornos virtuales
+########################
+venv/
+env/
+.venv/
+ENV/
+
+########################
+# Django
+########################
+*.sqlite3
 db.sqlite3
-db.sqlite3-journal
-/media
-/staticfiles
-/static
-*.pot
+media/
+staticfiles/
+static/
+local_settings.py
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-*.sublime-project
-*.sublime-workspace
+########################
+# Variables de entorno
+########################
+.env
+.env.*
+!.env.example
 
+########################
+# Docker
+########################
+*.tar
+docker-compose.override.yml
+.dockerignore
+
+########################
 # Terraform
-**/.terraform/
-terraform.tfstate
-terraform.tfstate.*
-*.tfvars
-*.tfvars.json
+########################
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
 crash.log
-crash.*.log
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraformrc
-terraform.rc
 
-# Docker
-.dockerignore
-docker-compose.override.yml
+########################
+# Git
+########################
+.git/
+.gitignore
 
-# Sistema operativo
+########################
+# OS / Editor
+########################
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Node (si usas frontend)
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Archivos de prueba
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-
-# Archivos sensibles
-*.pem
-*.key
-secrets.json
-credentials.json
-
-# Archivos temporales
-*.tmp
-*.temp
-*.bak
+.vscode/
+.idea/
 *.swp
-*.swo
-*~
 
-# MacOS
-.AppleDouble
-.LSOverride
-
-# Linux
-.directory
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Archivos compilados de PostgreSQL (si compilas localmente)
-*.sql
-
-# Datos de base de datos local
-postgres_data/
-data/
+########################
+# Tests / Docs (opcional)
+########################
+htmlcov/
+.coverage
+.pytest_cache/
+docs/
+tests/

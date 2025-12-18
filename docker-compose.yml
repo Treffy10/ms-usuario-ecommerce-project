@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # --- Contenedor de Base de Datos ---
+  db:
+    image: postgres:15-alpine
+    container_name: db-usuario
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Persistencia: los datos viven en la EC2, no se borran
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Contenedor de tu App Django ---
+  app:
+    image: ${DOCKER_IMAGE}
+    container_name: app-usuario
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy # Espera a que la DB esté lista para migrar
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn --bind 0.0.0.0:8000 servicio_usuario.wsgi:application"
+
+volumes:
+  postgres_data:

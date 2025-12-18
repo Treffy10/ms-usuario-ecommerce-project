@@ -1,209 +1,83 @@
-name: Pruebas Automáticas, Build de Docker y Despliegue con Terraform
+name: CI/CD Microservicio Usuario
 
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 env:
-  AWS_REGION: us-east-1
-  TERRAFORM_VERSION: 1.6.0
-  # Nombre y tag de la imagen que se va a construir y usar en AWS
-  IMAGE_TAG: ${{ secrets.DOCKERHUB_USERNAME }}/ms-usuario:latest
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/servicio-usuario:latest
 
 jobs:
   test:
-    # ... (El Job de test está casi perfecto, solo ajustamos la ENV de la DB)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: usuario_db_ecomerce
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
-    - uses: actions/checkout@v4 # 💡 v4
+      - uses: actions/checkout@v4
+      
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Instalar Dependencias de Sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev gcc
 
-    - name: Set up Python
-      uses: actions/setup-python@v5 # 💡 v5
-      with:
-        python-version: '3.11'
+      - name: Instalar Dependencias de Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Ejecutar Tests
+        # Aquí es donde GitHub entra a tu carpeta usuario/tests.py
+        run: python manage.py test usuario
 
-    - name: Cache pip packages
-      uses: actions/cache@v4 # 💡 v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    # 💡 Agregamos la configuración de la DB para que Django use el servicio de Postgres
-    - name: Run migrations and tests
-      env:
-        DEBUG: True
-        # Configuración para usar el servicio de Postgres en la red de GH Actions
-        DB_HOST: localhost
-        DB_PORT: 5432
-        DB_NAME: usuario_db_ecomerce
-        DB_USER: postgres
-        DB_PASSWORD: postgres
-      run: |
-        python manage.py migrate
-        pip install coverage
-        coverage run --source='usuario' manage.py test usuario
-        coverage xml
-        coverage report
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./coverage.xml
-        fail_ci_if_error: false
-
-  deploy:
+  build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
     steps:
-    - uses: actions/checkout@v4 # 💡 v4
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3 # 💡 v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: 🐳 Build & Push Docker Image
-      uses: docker/build-push-action@v5 # 💡 v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ env.IMAGE_TAG }} # Usamos la variable de entorno IMAGE_TAG
-
-    # --- Sección de Terraform (No hay grandes cambios aquí, está bien) ---
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-    # (Init, Plan, Apply - Se mantienen igual)
-
-    - name: Terraform Init
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        cd infra/terraform
-        terraform init \
-          -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
-          -backend-config="key=infra/terraform.tfstate" \
-          -backend-config="region=${{ env.AWS_REGION }}"
-
-    - name: Terraform Plan
-      # Resuelve: 'Reference to undeclared input variable' (image_0bb877.png)
-      # Resuelve: 'Too many command line arguments' (image_7faa64.png)
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        cd infra/terraform
-        terraform plan \
-          -var="db_password=${{ secrets.DB_PASSWORD }}" \
-          -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
-          -var="public_key_content=${{ secrets.PUBLIC_KEY_CONTENT }}" \
-          -var="dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \
-          -out=tfplan
-
-    - name: Terraform Apply
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        cd infra/terraform
-        terraform apply -auto-approve tfplan
-        
-    - name: Get Outputs (Inicializa y Obtiene EC2_IP)
-      working-directory: infra/terraform
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        # 1. Ejecutar Init de nuevo, pero con la bandera -reconfigure
-        # Esto resuelve el error "Backend initialization required" que viste.
-        terraform init \
-          -backend-config="bucket=${{ secrets.TERRAFORM_BUCKET }}" \
-          -backend-config="key=infra/terraform.tfstate" \
-          -backend-config="region=${{ env.AWS_REGION }}" \
-          -reconfigure 
-        
-        # 2. Ahora que el backend está configurado, podemos leer el output
-        ip=$(terraform output -raw ec2_public_ip 2>/dev/null | tr -d '\n' | tr -d '\r')
-        echo "EC2_IP=$ip" >> $GITHUB_ENV
-
-    # --- Sección de Despliegue (El cambio más grande, ahora usa Docker) ---
-    
-    # 💡 Usamos una acción dedicada para el SSH (más limpio)
-    - name: Configure SSH Agent
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-          ssh-private-key: ${{ secrets.EC2_PRIVATE_KEY }}
-
-    - name: Deploy Docker Image (SSH + reintentos)
-      env:
-        SSH_USER: ubuntu
-        # Pasamos el tag de la imagen al script de SSH
-        IMAGE_TO_DEPLOY: ${{ env.IMAGE_TAG }}
-      run: |
-        echo "🚀 Deploy a: $EC2_IP"
-
-        # Esperar a que SSH esté disponible (Mantenemos tu lógica de reintentos, es crucial)
-        for i in {1..12}; do # 💡 Reduje los reintentos a 12 (2 min)
-          echo "⏳ Esperando SSH ($i/12) en $EC2_IP..."
-          # Usamos ssh-agent, no necesitamos -i ~/.ssh/id_rsa
-          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "$SSH_USER@$EC2_IP" "echo SSH_OK" >/dev/null 2>&1; then
-            echo "✅ SSH disponible"
-            break
-          fi
-          sleep 10
-          if [ "$i" -eq 12 ]; then
-            echo "❌ Timeout esperando SSH"
-            exit 1
-          fi
-        done
-
-        # Deploy remoto: Actualiza el docker-compose.yml con la nueva imagen y la levanta
-        # 💡 NO necesitamos clonar, ni migrar con manage.py, ni venv. ¡Solo Docker!
-        ssh -o StrictHostKeyChecking=no "$SSH_USER@$EC2_IP" << EOF
-          set -e
+      - uses: actions/checkout@v4
+      
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
           
-          echo "📥 Pulling new image: $IMAGE_TO_DEPLOY"
-          docker pull $IMAGE_TO_DEPLOY
+      - name: Build y Push de la Imagen
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.DOCKER_IMAGE }}
 
-          echo "⬇️ Deteniendo y actualizando contenedores..."
-          cd /home/ubuntu/app
-          # Usa el archivo .env que creamos en user_data.sh
-          docker-compose up -d --force-recreate django-app
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Aquí iría tu lógica de Terraform para actualizar la EC2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.0
+          
+      # Terraform hará que la EC2 ejecute el docker-compose con la nueva imagen
+      - name: Terraform Apply
+        env:
+          # Credenciales de AWS para que Terraform pueda crear recursos
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-1
 
-          echo "✅ Despliegue de Docker finalizado"
-        EOF
-
-    - name: Notify deployment success
-      run: echo "✅ Despliegue exitoso en AWS con Docker y Terraform"
+          # Inyección de variables a Terraform (Secrets -> TF_VAR)
+          TF_VAR_db_name: ${{ secrets.DB_NAME }}
+          TF_VAR_db_user: ${{ secrets.DB_USER }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_docker_image: ${{ env.DOCKER_IMAGE }} # Esta viene de la variable de entorno del job
+        run: |
+          cd infra/terraform
+          terraform init
+          terraform apply -auto-approve
